@@ -22,12 +22,12 @@ IMGBB_API_KEY = "95c5713baa2adf32c45f91191939d7ad"
 STICKER_FILE_ID = "CAACAgUAAyEFAASsVPZOAAKlC2m-gprvRR2VReCarRJIbv_naowQAAJCGAACyAVoVjLmxGezxTrmHgQ"
 sticker_settings = db["sticker_settings"]
 
-# Log Group where the message will be sent - UPDATED
+# Log Group where the message will be sent
 LOG_GROUP_ID = -1003773882799
 
-# Allowed uploaders IDs - ONLY YOUR ID
+# Allowed uploaders IDs
 ALLOWED_UPLOADERS = {
-    7641508639,  # Only your ID
+    7641508639,
 }
 
 MARKET_COL = db["market"]
@@ -54,7 +54,7 @@ def upload_with_fallback(file_path: str) -> str:
     if not os.path.exists(file_path):
         raise FileNotFoundError("File not found")
 
-    # 1. Try ImgBB First
+    # 1. Try ImgBB First (Works only for images, videos will fail and fallback)
     if IMGBB_API_KEY and IMGBB_API_KEY != "YOUR_IMGBB_API_KEY_HERE":
         try:
             with open(file_path, "rb") as file:
@@ -69,9 +69,9 @@ def upload_with_fallback(file_path: str) -> str:
                 if "data" in data and "url" in data["data"]:
                     return data["data"]["url"]
         except Exception:
-            pass
+            pass # Fallback to Catbox
 
-    # 2. Try Catbox if ImgBB fails
+    # 2. Try Catbox if ImgBB fails (or if file is a video)
     try:
         with open(file_path, "rb") as file:
             r = requests.post(
@@ -83,7 +83,7 @@ def upload_with_fallback(file_path: str) -> str:
         if r.status_code == 200 and r.text.startswith("https"):
             return r.text.strip()
     except Exception:
-        pass
+        pass # Fallback to Graph.org
 
     # 3. Try Graph.org as last resort
     try:
@@ -164,16 +164,16 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     user = update.effective_user
 
-    # Authentication Check - Only your ID allowed
+    # Authentication Check
     if user.id not in ALLOWED_UPLOADERS:
-        return await msg.reply_text("❌ You are not authorized to use this command.")
+        return await msg.reply_text("❌ ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴀᴜᴛʜᴏʀɪᴢᴇᴅ ᴛᴏ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ.")
 
     reply = msg.reply_to_message
     
-    # Check: Allow Photo, Video, or Animation (GIF)
+    # --- CHECK: Allow Photo, Video, or Animation (GIF) ---
     if not reply or not (reply.photo or reply.video or reply.animation) or len(context.args) < 3:
         return await msg.reply_text(
-            "❌ Usage:\nReply to a <b>photo or video</b> with\n/upload name anime rarity_number",
+            "❌ ᴜsᴀɢᴇ:\nʀᴇᴘʟʏ ᴛᴏ ᴀ <b>ᴘʜᴏᴛᴏ ᴏʀ ᴠɪᴅᴇᴏ</b> ᴡɪᴛʜ\n/upload name anime rarity_number",
             parse_mode="HTML"
         )
 
@@ -183,10 +183,10 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         rarity_no = int(context.args[2])
     except ValueError:
-        return await msg.reply_text("❌ Rarity must be a number (1-12).")
+        return await msg.reply_text("❌ ʀᴀʀɪᴛʏ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ (1-12).")
 
     if rarity_no not in RARITY_MAP:
-        return await msg.reply_text("❌ Invalid rarity number.")
+        return await msg.reply_text("❌ ɪɴᴠᴀʟɪᴅ ʀᴀʀɪᴛʏ ɴᴜᴍʙᴇʀ.")
 
     rarity_text = RARITY_MAP[rarity_no]
     market_price = RARITY_PRICE_MAP.get(rarity_no, 1000)
@@ -196,7 +196,7 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     media_obj = reply.video or reply.animation if is_video else reply.photo[-1]
 
     # Process Media
-    processing_msg = await msg.reply_text(f"⏳ Processing {'video' if is_video else 'image'}, please wait...")
+    processing_msg = await msg.reply_text(f"⏳ ᴘʀᴏᴄᴇssɪɴɢ {'ᴠɪᴅᴇᴏ' if is_video else 'ɪᴍᴀɢᴇ'}, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ...")
     
     tg_file = await media_obj.get_file()
     ext = ".mp4" if is_video else ".png"
@@ -213,14 +213,15 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if use_sticker:
             try:
-                await processing_msg.edit_text("⏳ Applying sticker...")
+                await processing_msg.edit_text("⏳ ᴀᴘᴘʟʏɪɴɢ sᴛɪᴄᴋᴇʀ...")
                 final_upload_path = await apply_sticker(base_path)
             except Exception as e:
-                await processing_msg.edit_text(f"⚠️ Warning: Failed to apply sticker. Proceeding without it.\n`{e}`")
+                await processing_msg.edit_text(f"⚠️ ᴡᴀʀɴɪɴɢ: ғᴀɪʟᴇᴅ ᴛᴏ ᴀᴘᴘʟʏ sᴛɪᴄᴋᴇʀ. ᴘʀᴏᴄᴇᴇᴅɪɴɢ ᴡɪᴛʜᴏᴜᴛ ɪᴛ.\n`{e}`")
                 final_upload_path = base_path
 
-    await processing_msg.edit_text(f"⏳ Uploading {'video' if is_video else 'image'} to server...")
+    await processing_msg.edit_text(f"⏳ ᴜᴘʟᴏᴀᴅɪɴɢ {'ᴠɪᴅᴇᴏ' if is_video else 'ɪᴍᴀɢᴇ'} ᴛᴏ sᴇʀᴠᴇʀ...")
     try:
+        # Fallback system is called here
         media_url = upload_with_fallback(final_upload_path)
     except Exception as e:
         # Cleanup on fail
@@ -230,19 +231,20 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 os.remove(final_upload_path)
         except:
             pass
-        return await processing_msg.edit_text(f"❌ Upload failed:\n`{e}`")
+        return await processing_msg.edit_text(f"❌ ᴜᴘʟᴏᴀᴅ ғᴀɪʟᴇᴅ:\n`{e}`")
 
-    # Try to extract and upload video thumbnail
+    # Try to extract and upload video thumbnail (Useful for inline query previews)
     thum_url = None
     if is_video and hasattr(media_obj, 'thumbnail') and media_obj.thumbnail:
         try:
             thum_file = await media_obj.thumbnail.get_file()
             thum_path = f"{TEMP_DIR}/thumb_{thum_file.file_unique_id}.jpg"
             await thum_file.download_to_drive(thum_path)
+            # Use fallback system for thumbnails too
             thum_url = upload_with_fallback(thum_path)
             os.remove(thum_path)
         except Exception:
-            pass
+            pass # Ignore if thumbnail fails to upload
 
     char_id = await get_reusable_id()
 
@@ -264,6 +266,7 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db_doc["vid_url"] = media_url
         if thum_url:
             db_doc["thum_url"] = thum_url
+            # Fallback for code expecting an img_url even if it's an AMV
             db_doc["img_url"] = thum_url 
     else:
         db_doc["img_url"] = media_url
@@ -283,7 +286,7 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "name": name,
             "anime": anime,
             "rarity": rarity_no, 
-            "image": thum_url if is_video and thum_url else media_url,
+            "image": thum_url if is_video and thum_url else media_url, # Show thumb in market if video
             "price": market_price,
             "quantity": 1,
             "likes": 0,
@@ -291,7 +294,7 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "listed_at": datetime.utcnow()
         })
     except Exception as db_err:
-        return await msg.reply_text(f"❌ Database save failed:\n`{db_err}`")
+        return await msg.reply_text(f"❌ Dᴀᴛᴀʙᴀsᴇ sᴀᴠᴇ ғᴀɪʟᴇᴅ:\n`{db_err}`")
 
     # Group Notification Caption
     caption = (
@@ -304,7 +307,7 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 <b>Market Price:</b> {market_price}"
     )
 
-    # Send Notification to your Log Group
+    # Send Notification to the specific Group
     try:
         if is_video:
             await context.bot.send_video(
@@ -321,12 +324,12 @@ async def upload_waifu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
     except Exception as e:
-        await msg.reply_text(f"⚠️ Waifu added to DB, but failed to send log to group: {e}")
+        await msg.reply_text(f"⚠️ ᴡᴀɪғᴜ ᴀᴅᴅᴇᴅ ᴛᴏ ᴅʙ, ʙᴜᴛ ғᴀɪʟᴇᴅ ᴛᴏ sᴇɴᴅ ʟᴏɢ ᴛᴏ ɢʀᴏᴜᴘ: {e}")
 
     await processing_msg.edit_text(
-        f"✅ <b>{'Video' if is_video else 'Waifu'} successfully uploaded!</b>\n"
-        f"🆔 <b>ID:</b> {char_id}\n"
-        f"🪄 <b>Sticker:</b> {'ON' if use_sticker else ('N/A (Video)' if is_video else 'OFF')}",
+        f"✅ <b>{'Vɪᴅᴇᴏ' if is_video else 'Wᴀɪғᴜ'} sᴜᴄᴄᴇssғᴜʟʟʏ ᴜᴘʟᴏᴀᴅᴇᴅ!</b>\n"
+        f"🆔 <b>ɪᴅ:</b> {char_id}\n"
+        f"🪄 <b>Sᴛɪᴄᴋᴇʀ:</b> {'ON' if use_sticker else ('N/A (Video)' if is_video else 'OFF')}",
         parse_mode="HTML"
     )
 
